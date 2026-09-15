@@ -189,5 +189,45 @@ function liftRK4(start, dirAt, len, steps) {
   report('eye hit test real mismatches (penetration >= 2% of radius)', idMismatch, 0);
 }
 
+// 8. inverse of the eye: preimages(probe(theta, kappa, l)) contains (theta, kappa, l), and every preimage it returns
+//    really reaches the point. Counted against a brute-force scan of (u, l) for completeness.
+{
+  const L = 30, KMAX = 2;
+  let recoverErr = 0, reachErr = 0, missing = 0, cases = 0, countMismatch = 0;
+  seed = 4242;
+  const wrapD = (a) => Math.abs(((a + 3 * Math.PI) % (2 * Math.PI)) - Math.PI);
+  for (let n = 0; n < 3000; n++) {
+    const th = U(-Math.PI, Math.PI), k = U(-KMAX, KMAX) * (rnd() < 0.2 ? 0.01 : 1), ell = U(0.05, L);
+    const q = HG.probe(th, k, ell);
+    if (Math.hypot(q[0], q[1]) < 1e-3) continue;          // on the t axis the preimage is a whole circle
+    cases++;
+    const pre = HG.preimages(q, L, KMAX);
+    let bestD = Infinity;
+    for (const p of pre) {
+      bestD = Math.min(bestD, Math.max(wrapD(p.theta - th), Math.abs(p.kappa - k), Math.abs(p.ell - ell)));
+      reachErr = Math.max(reachErr, dist(HG.probe(p.theta, p.kappa, p.ell), q) / (1 + Math.abs(q[2])));
+    }
+    if (bestD > 1e-6) { missing++; if (missing < 4) console.log('      not recovered:', JSON.stringify({ th, k, ell, pre })); }
+    else recoverErr = Math.max(recoverErr, bestD);
+    // brute force count: sign changes of t(u) - q_t along the ray, over u with the right r
+    if (n < 300) {
+      const r = Math.hypot(q[0], q[1]);
+      let cnt = 0, prevG = null;
+      for (let i = 1; i <= 400000; i++) {
+        const u = (i / 400000) * KMAX * L * Math.sign(q[2] || 1) ;
+        const s = 2 * Math.sin(u / 2) / u, l = r / Math.abs(s);
+        const g = (l <= L && Math.abs(u / l) <= KMAX) ? HG.probe(0, u / l, l)[2] - q[2] : null;
+        if (g !== null && prevG !== null && (g === 0 || (g > 0) !== (prevG > 0))) cnt++;
+        prevG = g;
+      }
+      // the u < 0 side can only add the minimizing branch when q_t has the other sign, which the ray above already covers
+      if (Math.abs(cnt - pre.length) > 0 && Math.abs(q[2]) > 1e-6) { countMismatch++; if (countMismatch < 4) console.log('      count:', cnt, 'vs', pre.length, JSON.stringify(q)); }
+    }
+  }
+  report(`preimages recover the probe that made the point (${cases} points)`, recoverErr + missing, 1e-6);
+  report('every preimage reaches the point, |probe - q| / (1 + |t|)', reachErr, 1e-8);
+  report('number of preimages matches a brute-force root count along u (300 points)', countMismatch, 0);
+}
+
 console.log(failures ? `\n${failures} FAILED` : '\nall passed');
 process.exit(failures ? 1 : 0);

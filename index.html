@@ -75,7 +75,7 @@
     <div class="inset" id="godBox"><div id="god"></div><div class="cap">God view, t at 1/4 scale, drag to orbit, <kbd>G</kbd></div></div>
     <div id="keys">
       <kbd>W</kbd><kbd>S</kbd> drive &nbsp;<kbd>A</kbd><kbd>D</kbd> steer &nbsp;<kbd>Q</kbd><kbd>E</kbd> strafe &nbsp;<kbd>Shift</kbd> slow<br>
-      <kbd>[</kbd><kbd>]</kbd> steer curvature &nbsp;<kbd>F</kbd> follow probe &nbsp;<kbd>L</kbd> new loop<br>
+      <kbd>[</kbd><kbd>]</kbd> steer curvature &nbsp;<kbd>F</kbd> follow probe &nbsp;<kbd>L</kbd> new loop &nbsp;<kbd>C</kbd> clear roads<br>
       <kbd>H</kbd> hide insets &nbsp;<kbd>K</kbd> κ scale &nbsp;<kbd>V</kbd> resolution &nbsp;<kbd>R</kbd> restart &nbsp;<kbd>Esc</kbd> menu
     </div>
   </div>
@@ -88,7 +88,7 @@
     <div id="law">(x,y,t)·(x′,y′,t′) = (x+x′, y+y′, t+t′+2(xy′−yx′))</div>
     <div class="legend">
       <kbd>W</kbd> <kbd>S</kbd> drive, <kbd>A</kbd> <kbd>D</kbd> steer (turn in place when stopped), <kbd>Q</kbd> <kbd>E</kbd> strafe, <kbd>Shift</kbd> slow<br>
-      Click the eye to ask what a road reaches, <kbd>F</kbd> follows that road, <kbd>L</kbd> starts a new loop count<br>
+      Click the eye to ask what a road reaches and lay down one full turn of it, <kbd>F</kbd> follows that road, <kbd>C</kbd> clears roads, <kbd>L</kbd> starts a new loop count<br>
       <kbd>M</kbd> map, <kbd>G</kbd> god view, <kbd>H</kbd> pure eye, <kbd>[</kbd> <kbd>]</kbd> steer curvature, <kbd>R</kbd> restart, <kbd>Esc</kbd> menu
     </div>
     <div class="eyehow">The eye: across is the direction a road sets out in, with straight ahead in the middle. Up and down is how hard the road curves, left turns above the bright line and right turns below it. Each pixel shows the first ball its road reaches. Counterclockwise loops lift you by 4 times the area they enclose.</div>
@@ -218,7 +218,54 @@ const HG = (() => {
     }
     return { id, ell: id < 0 ? L : best, shade };
   }
-  return { mul, inv, rot, gauge, probe, worldOf, localOf, step, loopArea, hitObject, probeHit, NS, MAXW };
+
+  // ---- inverse of the eye: every probe from the identity that passes through a local point q. ----
+  // Along a probe t/r^2 depends only on the turning u = kappa l: F(u) = (u - sin u)/(1 - cos u). F is odd and increasing
+  // on (-2pi, 2pi), which is the minimizing branch. On each (2pi n, 2pi(n+1)) it falls from +inf to a minimum at
+  // UMIN[n] and rises back to +inf, so a point above you is reached by 0 or 2 probes per extra wrap.
+  const Fr = (u) => Math.abs(u) < 1e-2 ? u / 3 + u * u * u / 90 : (u - Math.sin(u)) / (1 - Math.cos(u));
+  const NWRAP = 12, UMIN = [0];
+  for (let n = 1; n <= NWRAP; n++) {
+    let a = 2 * PI * n + 1e-9, b = 2 * PI * (n + 1) - 1e-9;
+    for (let j = 0; j < 120; j++) { const m1 = a + (b - a) / 3, m2 = b - (b - a) / 3; if (Fr(m1) < Fr(m2)) b = m2; else a = m1; }
+    UMIN.push(0.5 * (a + b));
+  }
+  const dFr = (u) => { if (Math.abs(u) < 1e-2) return 1 / 3 + u * u / 30; const c = 1 - Math.cos(u); return (c * c - (u - Math.sin(u)) * Math.sin(u)) / (c * c); };
+  // F = rho on [a, b] where F is monotone: Newton, falling back to bisection whenever a step leaves the bracket
+  const solveF = (rho, a, b, rising) => {
+    let u = 0.5 * (a + b);
+    for (let j = 0; j < 60; j++) {
+      const f = Fr(u) - rho;
+      if ((f < 0) === rising) a = u; else b = u;
+      let nu = u - f / dFr(u);
+      if (!(nu > a && nu < b)) nu = 0.5 * (a + b);
+      if (Math.abs(nu - u) < 1e-13 * (1 + Math.abs(u)) || b - a < 1e-13 * (1 + Math.abs(u))) return nu;
+      u = nu;
+    }
+    return u;
+  };
+  const wrapA = (a) => { a = (a + PI) % (2 * PI); if (a < 0) a += 2 * PI; return a - PI; };
+  // Probes of length <= L and |kappa| <= kmax through q, as {theta, kappa, ell, key}. key names the branch of F and is
+  // continuous as q moves: 0 minimizing, +-(2n-1) and +-(2n) the falling and rising halves of wrap n, sign of t.
+  // Points on the t axis (r = 0) are reached by a whole circle of directions and return nothing.
+  function preimages(q, L, kmax) {
+    const out = [], r = Math.hypot(q[0], q[1]);
+    if (r > L || r < 1e-12) return out;
+    const phi = Math.atan2(q[1], q[0]), rho = q[2] / (r * r), sg = rho < 0 ? -1 : 1, a = Math.abs(rho);
+    const add = (u, key) => {
+      const s = Math.abs(u) < 1e-9 ? 1 : 2 * Math.sin(u / 2) / u, ell = r / Math.abs(s), kappa = u / ell;
+      if (ell <= L && Math.abs(kappa) <= kmax) out.push({ theta: wrapA(phi - u / 2 + (s < 0 ? PI : 0)), kappa, ell, key });
+    };
+    add(sg * solveF(a, 0, 2 * PI, true), 0);
+    for (let n = 1; n <= NWRAP; n++) {
+      if (PI * n * r > L || 2 * PI * n > kmax * L) break;   // l >= pi n r and l >= |u| / kmax
+      if (a < UMIN[n] / 2) continue;                        // F(UMIN[n]) = UMIN[n] / 2, since tan(u/2) = u/2 there
+      add(sg * solveF(a, 2 * PI * n, UMIN[n], false), sg * (2 * n - 1));
+      add(sg * solveF(a, UMIN[n], 2 * PI * (n + 1), true), sg * 2 * n);
+    }
+    return out;
+  }
+  return { mul, inv, rot, gauge, probe, worldOf, localOf, step, loopArea, hitObject, probeHit, preimages, Fr, UMIN, NS, MAXW };
 })();
 // END GEOMETRY
 </script>
@@ -387,6 +434,8 @@ const MAXOBJ = 256;
 const RES = [[320, 160], [480, 240], [640, 320]];
 const POWS = [1, 2, 3];
 const COL = { target: [1.0, 0.80, 0.25], hazard: [1.0, 0.18, 0.22] };
+const ROAD_MAX_L = 150, MAX_ROADS = 6;
+const ROAD_COL = ['#7cf29a', '#ff8adf', '#6ce0ff', '#ffb35c', '#c7a0ff', '#f4f06a'];
 
 const LEVELS = [
   { name: 'Level 1', title: 'Learn the eye',
@@ -408,7 +457,7 @@ const LEVELS = [
 const S = {
   mode: 'title', level: 0, pose: { x: 0, y: 0, t: 0, h: 0 }, tau: 0, trail: [], markIdx: 0, mark: null,
   objs: [], steerK: 0.5, powIdx: 1, resIdx: 1, showMap: true, showGod: true, showSide: true,
-  inspect: null, auto: null, done: false, fps: 60, time: 0,
+  inspect: null, auto: null, done: false, fps: 60, time: 0, roads: [], roadN: 0,
 };
 let best = {};
 try { best = JSON.parse(localStorage.getItem('hb-best') || '{}'); } catch (e) { best = {}; }
@@ -522,12 +571,76 @@ function drawOverlay() {
     c.fillStyle = 'rgba(200,220,255,0.55)'; c.fillText('κ ' + (k > 0 ? '+' : '') + k, 11, y + 4);
   }
   c.fillStyle = 'rgba(200,220,255,0.45)'; c.fillText('left turns', W - 70, 14); c.fillText('right turns', W - 76, H - 30);
+  drawRoadsInEye(c, W, H);
   // inspected probe crosshair
   if (S.inspect && S.inspect.live) {
     const x = uOfTheta(S.inspect.theta) * W, y = H * (1 - vOfKappa(S.inspect.kappa));
     c.strokeStyle = '#bfe3ff'; c.lineWidth = 1.5;
     c.beginPath(); c.arc(x, y, 9, 0, 2 * PI); c.moveTo(x - 15, y); c.lineTo(x - 5, y); c.moveTo(x + 5, y); c.lineTo(x + 15, y); c.moveTo(x, y - 15); c.lineTo(x, y - 5); c.moveTo(x, y + 5); c.lineTo(x, y + 15); c.stroke();
   }
+}
+
+// Roads laid down by clicking stay put in the world. From wherever you are now, a point of a road is seen along every
+// probe that reaches it (HG.preimages), so a road you have left appears in the eye as curves, one per branch of F.
+// Standing where you laid it, the whole minimizing branch collapses to the crosshair.
+function roadLocal(rd, s) { return HG.localOf(S.pose, HG.worldOf(rd.pose, HG.probe(rd.theta, rd.kappa, s))); }
+let roadCache = { key: '', strokes: [] };
+function drawRoadsInEye(c, W, H) {
+  if (!S.roads.length) return;
+  const stamp = [S.pose.x, S.pose.y, S.pose.t, S.pose.h, S.roadN, S.roads.length, S.powIdx, W, H, targetsLeft(), S.level].join();
+  if (stamp !== roadCache.key) roadCache = { key: stamp, strokes: traceRoads(W, H) };
+  c.save(); c.lineCap = 'round'; c.lineJoin = 'round'; c.lineWidth = 2;
+  for (const [color, alpha, path] of roadCache.strokes) { c.strokeStyle = color; c.globalAlpha = alpha; c.stroke(path); }
+  c.restore();
+}
+function traceRoads(W, H) {
+  const strokes = [];
+  const loc = localObjects().filter((o) => o.active);
+  const scr = (p) => [uOfTheta(p.theta) * W, H * (1 - vOfKappa(p.kappa))];
+  const hidden = (p) => { if (p.hid === undefined) p.hid = loc.length > 0 && HG.probeHit(p.theta, p.kappa, p.ell, loc).id >= 0; return p.hid; };
+  const NB = 4;
+  for (const rd of S.roads) {
+    const N = Math.max(40, Math.min(320, Math.ceil(10 * rd.len)));
+    const paths = Array.from({ length: NB }, () => new Path2D());
+    const at = (s) => { const m = new Map(); for (const p of HG.preimages(roadLocal(rd, s), PROBE_L, KAPPA_MAX)) m.set(p.key, p); return m; };
+    const line = (p, q) => {
+      const a = scr(p), b = scr(q);
+      if (Math.hypot(a[0] - b[0], a[1] - b[1]) > 24) return;   // wrap across theta = +-pi, or a sweep too fast to resolve
+      if (hidden(p) || hidden(q)) return;                       // a ball is nearer along that probe
+      const bin = Math.min(NB - 1, Math.floor(NB * 0.5 * (p.ell + q.ell) / PROBE_L));
+      paths[bin].moveTo(a[0], a[1]); paths[bin].lineTo(b[0], b[1]);
+    };
+    // refine where the image moves fast on screen, e.g. as the road passes near your t axis
+    const seg = (s0, p0, s1, p1, key, depth) => {
+      const a = scr(p0), b = scr(p1);
+      if (depth >= 7 || Math.hypot(a[0] - b[0], a[1] - b[1]) < 5) { line(p0, p1); return; }
+      const sm = 0.5 * (s0 + s1), pm = at(sm).get(key);
+      if (!pm) return;
+      seg(s0, p0, sm, pm, key, depth + 1); seg(sm, pm, s1, p1, key, depth + 1);
+    };
+    // a branch present at sIn and gone at sOut: follow it to its end; if both halves of one wrap end together, that is
+    // the fold where they meet, so join them
+    const edge = (sIn, mIn, sOut, mOut) => {
+      const ends = new Map();
+      for (const [key, p] of mIn) {
+        if (mOut.has(key)) continue;
+        let lo = sIn, hi = sOut, pl = p;
+        for (let j = 0; j < 8; j++) { const sm = 0.5 * (lo + hi), q = at(sm).get(key); if (q) { lo = sm; pl = q; } else hi = sm; }
+        seg(sIn, p, lo, pl, key, 0); ends.set(key, pl);
+      }
+      for (const [key, p] of ends) if (key % 2 !== 0 && ends.has(key + Math.sign(key))) line(p, ends.get(key + Math.sign(key)));
+    };
+    const ds = rd.len / N;
+    let prev = at(0);
+    for (let i = 1; i <= N; i++) {
+      const s = i * ds, cur = at(s);
+      for (const [key, p] of cur) { const q = prev.get(key); if (q) seg(s - ds, q, s, p, key, 0); }
+      edge(s - ds, prev, s, cur); edge(s, cur, s - ds, prev);
+      prev = cur;
+    }
+    for (let b = 0; b < NB; b++) strokes.push([rd.color, 0.25 + 0.75 * Math.exp(-1.7 * (b + 0.5) / NB), paths[b]]);
+  }
+  return strokes;
 }
 
 // ---------------- map ----------------
@@ -586,6 +699,14 @@ function drawMap() {
     c.fillStyle = o.kind === 'target' ? relColor(rt, 1) : 'rgba(255,150,160,0.9)';
     c.fillText((rt >= 0 ? '+' : '') + rt.toFixed(1), x, y - rr - 4);
   }
+  // laid-down roads
+  c.lineWidth = 1.5;
+  for (const rd of S.roads) {
+    c.strokeStyle = rd.color; c.globalAlpha = 0.85; c.beginPath();
+    for (let i = 0; i <= 160; i++) { const w = HG.worldOf(rd.pose, HG.probe(rd.theta, rd.kappa, rd.len * i / 160)); i ? c.lineTo(X(w[0]), Y(w[1])) : c.moveTo(X(w[0]), Y(w[1])); }
+    c.stroke();
+  }
+  c.globalAlpha = 1; c.lineWidth = 1;
   // inspected probe
   if (S.inspect) {
     const q = S.inspect; c.strokeStyle = '#bfe3ff'; c.setLineDash([3, 3]); c.beginPath();
@@ -632,6 +753,7 @@ const God = {
     const qg = new T.BufferGeometry(); qg.setAttribute('position', new T.BufferAttribute(this.probePos, 3));
     this.probe = new T.Line(qg, new T.LineDashedMaterial({ color: 0xbfe3ff, dashSize: 0.2, gapSize: 0.15 })); this.probe.frustumCulled = false; this.probe.visible = false; this.scene.add(this.probe);
     this.balls = new T.Group(); this.scene.add(this.balls);
+    this.roads = new T.Group(); this.scene.add(this.roads);
     this.yaw = -0.9; this.pitch = 0.5; this.dist = 16;
     const el = this.renderer.domElement; let drag = null;
     el.addEventListener('pointerdown', (e) => { drag = [e.clientX, e.clientY]; el.setPointerCapture(e.pointerId); });
@@ -661,6 +783,17 @@ const God = {
     for (const o of S.objs) {
       const mat = new this.T.MeshLambertMaterial({ color: o.kind === 'target' ? 0xffcf4a : 0xff3348, emissive: o.kind === 'target' ? 0x553800 : 0x330008, transparent: true, opacity: 0.75, side: this.T.DoubleSide });
       const m = new this.T.Mesh(this.koranyi(o), mat); o.mesh = m; this.balls.add(m);
+    }
+    this.rebuildRoads();
+  },
+  rebuildRoads() {
+    if (!this.ok) return;
+    while (this.roads.children.length) { const m = this.roads.children.pop(); m.geometry.dispose(); m.material.dispose(); }
+    for (const rd of S.roads) {
+      const pts = [];
+      for (let i = 0; i <= 240; i++) { const w = HG.worldOf(rd.pose, HG.probe(rd.theta, rd.kappa, rd.len * i / 240)); pts.push(this.V(w[0], w[1], w[2])); }
+      const ln = new this.T.Line(new this.T.BufferGeometry().setFromPoints(pts), new this.T.LineBasicMaterial({ color: rd.color }));
+      ln.frustumCulled = false; this.roads.add(ln);
     }
   },
   resize() {
@@ -724,7 +857,7 @@ function loadLevel(i) {
     ...L.targets.map(([x, y, t, r]) => ({ x, y, t, r, kind: 'target', active: true })),
     ...L.hazards.map(([x, y, t, r]) => ({ x, y, t, r, kind: 'hazard', active: true })),
   ];
-  S.done = false; S.steerK = 0.5;
+  S.done = false; S.steerK = 0.5; S.roads = [];
   resetRun(false);
   God.rebuild();
   $('objective').querySelector('.lvl').textContent = `${L.name}: ${L.title}`;
@@ -789,6 +922,7 @@ window.addEventListener('keydown', (e) => {
     case 'BracketRight': S.steerK = Math.min(3, S.steerK * 1.1); break;
     case 'KeyL': S.mark = { ...S.pose }; S.markIdx = S.trail.length - 1; S.trail.push({ x: S.pose.x, y: S.pose.y, t: S.pose.t }); S.markIdx = S.trail.length - 1; break;
     case 'KeyF': followProbe(); break;
+    case 'KeyC': S.roads = []; God.rebuildRoads(); break;
   }
 });
 window.addEventListener('keyup', (e) => { keys[e.code] = false; });
@@ -818,7 +952,12 @@ overlay.addEventListener('pointerdown', (e) => {
   if (hit.id < 0) what = `reaches nothing within length ${PROBE_L}`;
   else { const o = S.objs[hit.id]; what = `reaches a ${o.kind === 'target' ? 'gold' : 'red'} ball at (${o.x}, ${o.y}, ${o.t}) after length ${ell.toFixed(2)}`; }
   const lift = end[2];
-  $('info').textContent = `Road ${dir}, ${bend}: ${what}. Along it t changes by ${lift >= 0 ? '+' : ''}${lift.toFixed(2)}, 4 times the area between the road and its chord (${(lift / 4).toFixed(2)}). ${hit.id >= 0 ? 'F follows it.' : ''}`;
+  const turn = 2 * PI / Math.max(Math.abs(kappa), 1e-9), len = Math.min(ROAD_MAX_L, turn);
+  S.roads.push({ pose: { ...S.pose }, theta, kappa, len, color: ROAD_COL[S.roadN++ % ROAD_COL.length] });
+  if (S.roads.length > MAX_ROADS) S.roads.shift();
+  God.rebuildRoads();
+  const laid = len === turn ? `Laid down one full turn of it, length ${len.toFixed(2)}.` : `Laid down length ${ROAD_MAX_L} of it; a full turn at this κ is ${turn.toFixed(0)} long.`;
+  $('info').textContent = `Road ${dir}, ${bend}: ${what}. Along it t changes by ${lift >= 0 ? '+' : ''}${lift.toFixed(2)}, 4 times the area between the road and its chord (${(lift / 4).toFixed(2)}). ${laid} ${hit.id >= 0 ? 'F follows it. ' : ''}C clears roads.`;
   $('info').classList.add('on');
 });
 function followProbe() {

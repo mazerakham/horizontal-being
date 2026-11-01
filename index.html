@@ -9,24 +9,24 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <style>
-  :root { --bg:#05070d; --panel:#0b1020; --line:#1c2640; --ink:#d4dcea; --dim:#7d8aa3; --gold:#ffcf4a; --red:#ff4d5e; --blue:#6cb6ff; --orange:#ff9a3c; }
+  :root { --bg:#000; --panel:#000; --line:#222; --ink:#d4dcea; --dim:#7d8aa3; --gold:#ffcf4a; --red:#ff4d5e; --blue:#6cb6ff; --orange:#ff9a3c; }
   * { box-sizing: border-box; }
   html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); font: 14px/1.4 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; overflow: hidden; }
   #app { display: flex; gap: 12px; height: 100vh; padding: 10px 16px; }
   #eyeCol { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
-  #eyeWrap { position: relative; align-self: center; background: #000; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+  #eyeWrap { position: relative; align-self: center; background: #000; overflow: hidden; }
   #eye, #eyeOverlay { position: absolute; inset: 0; width: 100%; height: 100%; }
   #eye { image-rendering: pixelated; image-rendering: crisp-edges; }
   #eyeOverlay { cursor: crosshair; }
   #hud { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 4px 14px; font-variant-numeric: tabular-nums; }
   .stat b { color: var(--dim); font-weight: 500; margin-right: 6px; }
-  #objective { color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; }
+  #objective { color: var(--ink); }
   #objective .lvl { color: var(--gold); font-weight: 600; margin-right: 8px; }
   #info { color: var(--dim); min-height: 1.4em; }
   #info.on { color: #bfe3ff; }
   #side { width: 320px; flex: none; display: flex; flex-direction: column; gap: 10px; }
   #side.hidden { display: none; }
-  .inset { position: relative; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+  .inset { position: relative; border-top: 1px solid var(--line); overflow: hidden; }
   .inset .cap { position: absolute; left: 8px; top: 5px; font-size: 12px; color: var(--dim); pointer-events: none; }
   #mapBox { height: 300px; }
   #map { width: 100%; height: 100%; display: block; }
@@ -34,23 +34,26 @@
   #god { width: 100%; height: 100%; }
   #god canvas { display: block; }
   #keys { font-size: 12px; color: var(--dim); line-height: 1.5; }
-  kbd { font: 11px ui-monospace, Menlo, monospace; background: #151c30; border: 1px solid #2a3552; border-bottom-width: 2px; border-radius: 4px; padding: 0 4px; color: var(--ink); }
-  #card { position: absolute; left: 50%; top: 14px; transform: translate(-50%, -30px); opacity: 0; transition: opacity .35s, transform .35s; background: rgba(8,12,26,.92); border: 1px solid #34426a; border-radius: 8px; padding: 10px 16px; max-width: min(640px, 90%); pointer-events: none; text-align: center; }
+  kbd { font: 12px ui-monospace, Menlo, monospace; color: #fff; }
+  #card { position: absolute; left: 50%; top: 14px; transform: translate(-50%, -30px); opacity: 0; transition: opacity .35s, transform .35s; background: rgba(0,0,0,.85); padding: 10px 16px; max-width: min(640px, 90%); pointer-events: none; text-align: center; }
   #card.show { opacity: 1; transform: translate(-50%, 0); }
   #card h3 { margin: 0 0 4px; color: var(--gold); font-size: 16px; }
   #card p { margin: 0; }
   #card .sub { color: var(--dim); font-size: 12px; margin-top: 4px; }
   #card.bad h3 { color: var(--red); }
-  #title { position: fixed; inset: 0; background: radial-gradient(ellipse at 50% 30%, #121a36 0%, #05070d 70%); display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 10; }
+  #title { position: fixed; inset: 0; background: #000; display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 10; }
   #title[hidden] { display: none; }
   #titleInner { max-width: 760px; text-align: center; }
   #title h1 { font-size: 44px; margin: 0; letter-spacing: .02em; color: #fff; }
   #title .tag { color: var(--dim); margin: 6px 0 18px; }
   #law { font-size: 17px; margin: 10px 0 18px; color: #e8eefc; overflow-x: auto; }
-  .legend { display: inline-block; text-align: left; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px 16px; line-height: 1.9; }
-  .eyehow { color: #aab6cc; margin: 16px auto 8px; max-width: 640px; }
+  .legend { display: inline-block; text-align: left; line-height: 1.9; color: var(--dim); }
+  .step { font-size: 18px; line-height: 1.6; color: #fff; max-width: 620px; margin: 0 auto; min-height: 8.5em; text-align: left; }
+  .step p { margin: 0 0 .8em; }
+  .stepnav { margin-top: 10px; color: var(--dim); }
+  .stepnav button { font: inherit; background: none; color: #fff; border: 0; text-decoration: underline; cursor: pointer; padding: 0 6px; }
   .levels { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: 16px; }
-  .levels button { font: inherit; background: #141d38; color: var(--ink); border: 1px solid #34426a; border-radius: 8px; padding: 10px 14px; cursor: pointer; min-width: 150px; }
+  .levels button { font: inherit; background: none; color: var(--ink); border: 1px solid #333; padding: 10px 14px; cursor: pointer; min-width: 150px; }
   .levels button:hover { border-color: var(--gold); }
   .levels button .n { color: var(--gold); font-weight: 700; display: block; }
   .levels button .best { color: var(--dim); font-size: 12px; }
@@ -68,14 +71,14 @@
     </div>
     <div id="objective"><span class="lvl"></span><span class="txt"></span></div>
     <div id="hud"></div>
-    <div id="info">Click anywhere in the eye to ask what that road reaches.</div>
+    <div id="info">Click anywhere in the view to ask what that road reaches.</div>
   </div>
   <div id="side">
     <div class="inset" id="mapBox"><canvas id="map"></canvas><div class="cap">Map (xy), shaded loop area, <kbd>M</kbd></div></div>
     <div class="inset" id="godBox"><div id="god"></div><div class="cap">God view, t at 1/4 scale, drag to orbit, <kbd>G</kbd></div></div>
     <div id="keys">
-      <kbd>W</kbd><kbd>S</kbd> drive &nbsp;<kbd>A</kbd><kbd>D</kbd> steer &nbsp;<kbd>Q</kbd><kbd>E</kbd> strafe &nbsp;<kbd>Shift</kbd> slow<br>
-      <kbd>[</kbd><kbd>]</kbd> steer curvature &nbsp;<kbd>F</kbd> follow probe &nbsp;<kbd>L</kbd> new loop &nbsp;<kbd>C</kbd> clear roads<br>
+      <kbd>W</kbd><kbd>S</kbd> drive &nbsp;<kbd>←</kbd><kbd>→</kbd> turn harder (it holds) &nbsp;<kbd>Space</kbd> straighten &nbsp;<kbd>Q</kbd><kbd>E</kbd> strafe &nbsp;<kbd>Shift</kbd> slow<br>
+      <kbd>F</kbd> follow probe &nbsp;<kbd>L</kbd> new loop &nbsp;<kbd>C</kbd> clear roads &nbsp;<kbd>G</kbd> 3D view<br>
       <kbd>H</kbd> hide insets &nbsp;<kbd>K</kbd> κ scale &nbsp;<kbd>V</kbd> resolution &nbsp;<kbd>R</kbd> restart &nbsp;<kbd>Esc</kbd> menu
     </div>
   </div>
@@ -84,16 +87,17 @@
 <div id="title">
   <div id="titleInner">
     <h1>Horizontal Being</h1>
-    <div class="tag">You live in the first Heisenberg group. You can only move horizontally, and you see along horizontal geodesics.</div>
-    <div id="law">(x,y,t)·(x′,y′,t′) = (x+x′, y+y′, t+t′+2(xy′−yx′))</div>
+    <div class="step" id="step"></div>
+    <div class="stepnav"><button id="prev">Back</button> <span id="stepn"></span> <button id="next">Next</button></div>
+    <div id="menu" hidden>
     <div class="legend">
-      <kbd>W</kbd> <kbd>S</kbd> drive, <kbd>A</kbd> <kbd>D</kbd> steer (turn in place when stopped), <kbd>Q</kbd> <kbd>E</kbd> strafe, <kbd>Shift</kbd> slow<br>
-      Click the eye to ask what a road reaches and lay down one full turn of it, <kbd>F</kbd> follows that road, <kbd>C</kbd> clears roads, <kbd>L</kbd> starts a new loop count<br>
-      <kbd>M</kbd> map, <kbd>G</kbd> god view, <kbd>H</kbd> pure eye, <kbd>[</kbd> <kbd>]</kbd> steer curvature, <kbd>R</kbd> restart, <kbd>Esc</kbd> menu
+      <kbd>W</kbd> <kbd>S</kbd> drive, <kbd>←</kbd> <kbd>→</kbd> turn harder (it holds; turn in place when stopped), <kbd>Space</kbd> straighten, <kbd>Q</kbd> <kbd>E</kbd> strafe, <kbd>Shift</kbd> slow<br>
+      Click the view to ask what a road reaches and lay down one full turn of it, <kbd>F</kbd> follows that road, <kbd>C</kbd> clears roads, <kbd>L</kbd> starts a new loop count<br>
+      <kbd>M</kbd> map, <kbd>G</kbd> 3D view, <kbd>H</kbd> view only, <kbd>R</kbd> restart, <kbd>Esc</kbd> menu
     </div>
-    <div class="eyehow">The eye: across is the direction a road sets out in, with straight ahead in the middle. Up and down is how hard the road curves, left turns above the bright line and right turns below it. Each pixel shows the first ball its road reaches. Counterclockwise loops lift you by 4 times the area they enclose.</div>
     <div class="levels" id="levelButtons"></div>
     <div class="tag" style="margin-top:14px">Press <kbd>Enter</kbd> to play, or <kbd>1</kbd> to <kbd>4</kbd> to pick a level.</div>
+    </div>
   </div>
 </div>
 
@@ -429,6 +433,7 @@ const PI = Math.PI;
 const KAPPA_MAX = 2.0;
 const PROBE_L = 30;
 const SPEED = 3.0, SLOW = 0.35, OMEGA0 = 1.8;
+const KAPPA_RATE = 0.8;          // how fast the arrows change your curvature, per second
 const TS = 0.25;                 // god view t scale
 const MAXOBJ = 256;
 const RES = [[320, 160], [480, 240], [640, 320]];
@@ -456,7 +461,7 @@ const LEVELS = [
 
 const S = {
   mode: 'title', level: 0, pose: { x: 0, y: 0, t: 0, h: 0 }, tau: 0, trail: [], markIdx: 0, mark: null,
-  objs: [], steerK: 0.5, powIdx: 1, resIdx: 1, showMap: true, showGod: true, showSide: true,
+  objs: [], kappa: 0, powIdx: 1, resIdx: 1, showMap: true, showGod: false, showSide: true,
   inspect: null, auto: null, done: false, fps: 60, time: 0, roads: [], roadN: 0,
 };
 let best = {};
@@ -572,6 +577,10 @@ function drawOverlay() {
   }
   c.fillStyle = 'rgba(200,220,255,0.45)'; c.fillText('left turns', W - 70, 14); c.fillText('right turns', W - 76, H - 30);
   drawRoadsInEye(c, W, H);
+  // your road: the pixel straight ahead at your current curvature
+  { const x = uOfTheta(0) * W, y = H * (1 - vOfKappa(S.kappa));
+    c.strokeStyle = '#fff'; c.lineWidth = 1.5;
+    c.beginPath(); c.moveTo(x - 7, y - 7); c.lineTo(x, y); c.lineTo(x - 7, y + 7); c.moveTo(x + 7, y - 7); c.lineTo(x, y); c.lineTo(x + 7, y + 7); c.stroke(); }
   // inspected probe crosshair
   if (S.inspect && S.inspect.live) {
     const x = uOfTheta(S.inspect.theta) * W, y = H * (1 - vOfKappa(S.inspect.kappa));
@@ -857,14 +866,14 @@ function loadLevel(i) {
     ...L.targets.map(([x, y, t, r]) => ({ x, y, t, r, kind: 'target', active: true })),
     ...L.hazards.map(([x, y, t, r]) => ({ x, y, t, r, kind: 'hazard', active: true })),
   ];
-  S.done = false; S.steerK = 0.5; S.roads = [];
+  S.done = false; S.kappa = 0; S.roads = [];
   resetRun(false);
   God.rebuild();
   $('objective').querySelector('.lvl').textContent = `${L.name}: ${L.title}`;
   $('objective').querySelector('.txt').textContent = L.text;
   S.mode = 'play'; $('title').hidden = true;
-  $('info').textContent = 'Click anywhere in the eye to ask what that road reaches.'; $('info').classList.remove('on');
-  showCard(`${L.name}: ${L.title}`, L.text, 'Click the eye to ask what a road reaches.', { ms: 7000 });
+  $('info').textContent = 'Click anywhere in the view to ask what that road reaches.'; $('info').classList.remove('on');
+  showCard(`${L.name}: ${L.title}`, L.text, 'Click the view to ask what a road reaches.', { ms: 7000 });
   updateHud(true);
 }
 function targetsLeft() { return S.objs.filter((o) => o.kind === 'target' && o.active).length; }
@@ -904,13 +913,16 @@ window.addEventListener('keydown', (e) => {
   if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) e.preventDefault();
   keys[e.code] = true;
   if (S.mode === 'title') {
+    const atMenu = stepIdx === INTRO.length;
+    if (!atMenu && ['Enter', 'ArrowRight', 'Space'].includes(e.code)) { showStep(stepIdx + 1); return; }
+    if (e.code === 'ArrowLeft') { showStep(stepIdx - 1); return; }
     if (e.code === 'Enter') loadLevel(S.levelChosen ?? 0);
     const m = /^Digit([1-4])$/.exec(e.code); if (m) loadLevel(+m[1] - 1);
     return;
   }
   if (DRIVE.includes(e.code)) { if (S.auto) S.auto = null; }
   switch (e.code) {
-    case 'Escape': S.mode = 'title'; $('title').hidden = false; S.levelChosen = S.level; renderTitleButtons(); break;
+    case 'Escape': S.mode = 'title'; $('title').hidden = false; S.levelChosen = S.level; renderTitleButtons(); showStep(INTRO.length); break;
     case 'KeyR': loadLevel(S.level); break;
     case 'KeyN': if (S.done && S.level + 1 < LEVELS.length) loadLevel(S.level + 1); break;
     case 'KeyM': S.showMap = !S.showMap; applyInsets(); break;
@@ -918,8 +930,7 @@ window.addEventListener('keydown', (e) => {
     case 'KeyH': S.showSide = !S.showSide; applyInsets(); break;
     case 'KeyK': S.powIdx = (S.powIdx + 1) % POWS.length; showCard('κ scale', `κ = 2·v^${POWS[S.powIdx]}`, POWS[S.powIdx] === 1 ? 'linear' : 'more room near the horizon', { ms: 1800 }); break;
     case 'KeyV': S.resIdx = (S.resIdx + 1) % RES.length; showCard('Resolution', RES[S.resIdx].join(' × '), '', { ms: 1500 }); break;
-    case 'BracketLeft': S.steerK = Math.max(0.05, S.steerK / 1.1); break;
-    case 'BracketRight': S.steerK = Math.min(3, S.steerK * 1.1); break;
+    case 'Space': S.kappa = 0; break;
     case 'KeyL': S.mark = { ...S.pose }; S.markIdx = S.trail.length - 1; S.trail.push({ x: S.pose.x, y: S.pose.y, t: S.pose.t }); S.markIdx = S.trail.length - 1; break;
     case 'KeyF': followProbe(); break;
     case 'KeyC': S.roads = []; God.rebuildRoads(); break;
@@ -963,7 +974,7 @@ overlay.addEventListener('pointerdown', (e) => {
 function followProbe() {
   const q = S.inspect; if (!q || S.done || S.auto) return;
   const moved = Math.hypot(S.pose.x - q.pose.x, S.pose.y - q.pose.y, S.pose.t - q.pose.t) > 1e-6 || Math.abs(S.pose.h - q.pose.h) > 1e-6;
-  if (moved) { $('info').textContent = 'You moved since asking. Click the eye again first.'; return; }
+  if (moved) { $('info').textContent = 'You moved since asking. Click the view again first.'; return; }
   const pen = LEVELS[S.level].followPenalty || 0;
   if (pen) { S.tau += pen; showCard('Following the road', `+${pen} s on the clock`, '', { ms: 1500 }); }
   S.auto = { phase: 'turn', h: q.pose.h + q.theta, k: q.kappa, left: q.ell + (q.id >= 0 ? Math.min(0.6, 0.5 * S.objs[q.id].r) : 0) };
@@ -978,7 +989,11 @@ function update(dt) {
   const str = (keys.KeyQ ? 1 : 0) - (keys.KeyE ? 1 : 0);
   const turn = (keys.KeyA || keys.ArrowLeft ? 1 : 0) - (keys.KeyD || keys.ArrowRight ? 1 : 0);
   let vf = fwd * SPEED * slow, vs = str * SPEED * slow * 0.7;
-  let omega = vf !== 0 ? turn * S.steerK * vf : turn * OMEGA0 * slow;
+  // Driving, the arrows change your curvature and it holds when you let go, so hands off you follow one geodesic.
+  // Curvature, not turn rate, is what is kept: Shift slows you down without bending your path.
+  // Standing still, the arrows turn you in place.
+  if (vf !== 0 && turn && !S.done && !S.auto) S.kappa = Math.max(-KAPPA_MAX, Math.min(KAPPA_MAX, S.kappa + turn * KAPPA_RATE * dt));
+  let omega = vf !== 0 ? S.kappa * vf : turn * OMEGA0 * slow;
   if (S.done) { vf = 0; vs = 0; omega = 0; }
   let driveLen = Infinity;
   if (S.auto) {
@@ -991,7 +1006,7 @@ function update(dt) {
     if (a.phase === 'drive') {
       const ds = Math.min(SPEED * dt, a.left);
       vf = ds / dt; omega = a.k * vf; driveLen = ds; a.left -= ds;
-      if (a.left <= 1e-9) S.auto = null;
+      if (a.left <= 1e-9) { S.auto = null; S.kappa = a.k; }
     }
   }
   const moving = vf !== 0 || vs !== 0 || omega !== 0;
@@ -1014,15 +1029,12 @@ function updateHud(force) {
   hudTick = S.time;
   const p = S.pose, A = HG.loopArea(S.mark, p);
   const tot = S.objs.filter((o) => o.kind === 'target').length;
-  const deg = ((p.h * 180 / PI) % 360 + 360) % 360;
   $('hud').innerHTML = [
     ['τ', `${S.tau.toFixed(1)} s`],
-    ['x y t', `${p.x.toFixed(2)}, ${p.y.toFixed(2)}, ${p.t.toFixed(2)}`],
-    ['heading', `${deg.toFixed(0)}°`],
+    ['t', p.t.toFixed(2)],
     ['loop area', `${A.toFixed(2)} (4A ${(4 * A).toFixed(1)})`],
-    ['steer κ', `${S.steerK.toFixed(3)} (radius ${(1 / S.steerK).toFixed(2)})`],
+    ['turning κ', Math.abs(S.kappa) < 5e-4 ? '0 (straight)' : `${S.kappa > 0 ? '+' : ''}${S.kappa.toFixed(3)} (radius ${(1 / Math.abs(S.kappa)).toFixed(2)}, ${S.kappa > 0 ? 'left' : 'right'})`],
     ['gold left', `${targetsLeft()} of ${tot}`],
-    ['eye', `${RES[S.resIdx].join('×')}, ${S.fps.toFixed(0)} fps`],
   ].map(([k, v]) => `<div class="stat"><b>${k}</b>${v}</div>`).join('');
 }
 
@@ -1037,6 +1049,35 @@ function layout() {
 }
 window.addEventListener('resize', layout);
 
+// ---------------- intro: what the view is, one idea per step ----------------
+const tex = (src) => { try { return katex.renderToString(src, { throwOnError: true }); } catch (e) { return src; } };
+const INTRO = [
+  () => `<p>You live in the Heisenberg group. A point is ${tex('(x, y, t)')}, and moving by ${tex("(x', y', t')")} takes you to</p>
+         <p style="text-align:center">${tex(String.raw`\bigl(x+x',\; y+y',\; t+t'+2(xy'-yx')\bigr).`)}</p>
+         <p>You can only move horizontally. Light can too: it travels along horizontal geodesics.</p>`,
+  () => `<p>A horizontal geodesic leaving your eye is fixed by two numbers: the angle it sets out at, and its curvature ${tex('\\kappa')}.</p>
+         <p>From above, it runs around a circle of radius ${tex('1/\\kappa')}, or along a straight line when ${tex('\\kappa = 0')}.</p>`,
+  () => `<p>So the view is a window with one pixel for each pair of numbers.</p>
+         <p>Across is the angle, straight ahead in the middle. Up and down is ${tex('\\kappa')}: straight roads on the bright line, left turns above it, right turns below it.</p>`,
+  () => `<p>Each pixel shows the first ball its road reaches.</p>
+         <p>A road that turns left climbs in ${tex('t')}, by 4 times the area between it and its chord. A road that turns right goes down. So a ball straight above you shows up above the bright line, and never on it.</p>`,
+  () => `<p>Driving with <kbd>W</kbd>, the arrow keys change how hard you turn, and the turn holds when you let go. Hands off, you are driving along one of the roads in the view.</p>
+         <p>The white mark in the middle of the view is your road. <kbd>Space</kbd> straightens it.</p>`,
+];
+let stepIdx = 0;
+function showStep(i) {
+  stepIdx = Math.max(0, Math.min(INTRO.length, i));
+  const atMenu = stepIdx === INTRO.length;
+  $('step').hidden = atMenu; $('menu').hidden = !atMenu;
+  $('prev').style.visibility = stepIdx === 0 ? 'hidden' : '';
+  $('next').textContent = stepIdx === INTRO.length - 1 ? 'Levels' : 'Next';
+  $('next').style.visibility = atMenu ? 'hidden' : '';
+  $('stepn').textContent = atMenu ? '' : `${stepIdx + 1} of ${INTRO.length}`;
+  if (!atMenu) $('step').innerHTML = INTRO[stepIdx]();
+}
+$('prev').addEventListener('click', () => showStep(stepIdx - 1));
+$('next').addEventListener('click', () => showStep(stepIdx + 1));
+
 function renderTitleButtons() {
   const box = $('levelButtons'); box.innerHTML = '';
   LEVELS.forEach((L, i) => {
@@ -1049,10 +1090,8 @@ function renderTitleButtons() {
 }
 
 function boot() {
-  if (window.katex) {
-    try { katex.render(String.raw`(x,y,t)\cdot(x',y',t') = \bigl(x+x',\; y+y',\; t+t'+2(xy'-yx')\bigr)`, $('law'), { throwOnError: true }); } catch (e) { console.warn('KaTeX', e); }
-  }
   renderTitleButtons();
+  showStep(0);
   try { initGL(); } catch (e) { console.error(e); $('eyeWrap').insertAdjacentHTML('beforeend', '<div id="glfail">Eye shader failed: ' + String(e.message).slice(0, 200) + '</div>'); }
   God.init();
   S.objs = LEVELS[0].targets.map(([x, y, t, r]) => ({ x, y, t, r, kind: 'target', active: true }));
